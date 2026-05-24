@@ -1,8 +1,12 @@
 import type React from "react"
 import { useLocation, Link } from "react-router-dom"
-import { ChevronRight, Home } from "lucide-react"
+import { ChevronRight, Gamepad2, LogOut, UserRound } from "lucide-react"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { menuItems } from "@/config/menu"
+import { useEmulator } from "@/context/EmulatorContext"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { AuthDialog } from "@/components/layout/AuthDialog"
 
 interface BreadcrumbItem {
   label: string
@@ -13,16 +17,17 @@ interface BreadcrumbItem {
 export function BreadcrumbHeader() {
   const location = useLocation()
   const breadcrumbs = generateBreadcrumbs(location.pathname)
+  const { selectedGame, user, logout } = useEmulator()
 
   return (
-    <header className="flex h-14 items-center bg-background px-4 lg:px-6 border-b border-border shrink-0">
-      <div className="flex h-full items-center gap-3">
+    <header className="flex h-14 items-center justify-between gap-3 border-b border-border bg-background px-4 lg:px-6 shrink-0">
+      <div className="flex h-full min-w-0 items-center gap-3">
         <SidebarTrigger />
         <div data-orientation="vertical" className="shrink-0 bg-border w-[1px] h-4"></div>
 
-        <nav className="flex items-center text-sm">
+        <nav className="flex min-w-0 items-center text-sm">
           <ol className="flex items-center gap-1">
-            <li>
+            {/* <li>
               <Link
                 to="/"
                 className="flex h-9 items-center gap-1.5 rounded-md px-2 text-muted-foreground transition-colors hover:text-foreground"
@@ -30,7 +35,7 @@ export function BreadcrumbHeader() {
                 <Home className="h-4 w-4" />
                 <span className="sr-only sm:not-sr-only sm:inline">Home</span>
               </Link>
-            </li>
+            </li> */}
 
             {breadcrumbs.map((item, index) => (
               <li key={item.path} className="flex items-center gap-1">
@@ -53,6 +58,27 @@ export function BreadcrumbHeader() {
             ))}
           </ol>
         </nav>
+      </div>
+      <div className="flex min-w-0 items-center gap-2">
+        {selectedGame ? (
+          <Badge variant="outline" className="hidden max-w-[260px] gap-1 truncate sm:inline-flex">
+            <Gamepad2 className="size-3" />
+            <span className="truncate">{selectedGame.displayName}</span>
+          </Badge>
+        ) : null}
+        {user ? (
+          <Button size="sm" variant="outline" onClick={() => void logout()}>
+            <LogOut className="size-4" />
+            <span className="hidden sm:inline">Logout</span>
+          </Button>
+        ) : (
+          <AuthDialog>
+            <Button size="sm">
+              <UserRound className="size-4" />
+              <span className="hidden sm:inline">Login</span>
+            </Button>
+          </AuthDialog>
+        )}
       </div>
     </header>
   )

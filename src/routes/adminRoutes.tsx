@@ -10,7 +10,7 @@ export function AdminRoutes() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<AdminLayout />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<Navigate to="/library" replace />} />
           {autoRoutes}
         </Route>
       </Routes>

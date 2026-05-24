@@ -1,26 +1,17 @@
 import React from "react"
-import { Home, BarChart2, Settings, List, ChevronRight } from "lucide-react"
+import { Gamepad2, HardDrive, Library, Save, Settings } from "lucide-react"
 
 export type MenuItem = {
   label: string
   path: string
   icon: React.ReactNode
-  // Optional children for submenus
   children?: MenuItem[]
 }
 
 export const menuItems: MenuItem[] = [
-  { label: "Dashboard", path: "/dashboard", icon: <Home size={16} /> },
-  { label: "Analytics", path: "/analytics", icon: <BarChart2 size={16} /> },
-  { label: "Lmao", path: "/lmao", icon: <List size={16} /> },
+  { label: "Library", path: "/library", icon: <Library size={16} /> },
+  { label: "Play", path: "/play", icon: <Gamepad2 size={16} /> },
+  { label: "Saves", path: "/saves", icon: <Save size={16} /> },
+  { label: "Storage", path: "/storage", icon: <HardDrive size={16} /> },
   { label: "Settings", path: "/settings", icon: <Settings size={16} /> },
-  {
-    label: "Menu1",
-    path: "/menu1",
-    icon: <List size={16} />,
-    children: [
-      { label: "Submenu1", path: "/menu1/submenu1", icon: <ChevronRight size={16} /> },
-      { label: "Submenu2", path: "/menu1/submenu2", icon: <ChevronRight size={16} /> },
-    ],
-  },
 ]

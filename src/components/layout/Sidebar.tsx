@@ -11,13 +11,15 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { menuItems } from "@/config/menu"
-import { LucideLayoutDashboard, ChevronRight } from "lucide-react"
+import { Cable, ChevronRight } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useEmulator } from "@/context/EmulatorContext"
+import { Badge } from "@/components/ui/badge"
 
 export function AdminSidebar() {
   const location = useLocation()
-  // State to control which menu with children is open 
   const [openSubmenu, setOpenSubmenu] = React.useState<string | null>(null)
+  const { user, localGames } = useEmulator()
 
   const toggleSubmenu = (path: string) => {
     setOpenSubmenu((prev) => (prev === path ? null : path))
@@ -32,15 +34,25 @@ export function AdminSidebar() {
     >
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <LucideLayoutDashboard className="h-4 w-4" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <Cable className="h-4 w-4" />
           </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold">Admin Dashboard</span>
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate text-sm font-semibold">ROM Deck</span>
+            <span className="truncate text-xs text-muted-foreground">Nintendo emulator</span>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="rounded-md border bg-background px-2.5 py-2">
+            <div className="text-lg font-semibold leading-none">{localGames.length}</div>
+            <div className="mt-1 text-xs text-muted-foreground">ROM local</div>
+          </div>
+          <div className="rounded-md border bg-background px-2.5 py-2">
+            <div className="text-lg font-semibold leading-none">{user ? "On" : "Off"}</div>
+            <div className="mt-1 text-xs text-muted-foreground">Cloud</div>
           </div>
         </div>
       </SidebarHeader>
-      {/* <SidebarSeparator /> */}
       <SidebarContent className="p-2">
         <SidebarMenu>
           {menuItems.map((item) => {
@@ -109,12 +121,15 @@ export function AdminSidebar() {
         <div className="flex items-center gap-2">
           <Avatar className="h-8 w-8">
             <AvatarImage src="/placeholder.svg?height=32&width=32" alt="User" />
-            <AvatarFallback>U</AvatarFallback>
+            <AvatarFallback>{user?.email?.[0]?.toUpperCase() ?? "G"}</AvatarFallback>
           </Avatar>
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">Admin User</span>
-            <span className="text-xs text-muted-foreground">admin@example.com</span>
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate text-sm font-medium">{user?.displayName ?? "Guest player"}</span>
+            <span className="truncate text-xs text-muted-foreground">{user?.email ?? "Local only"}</span>
           </div>
+          <Badge variant={user ? "default" : "outline"} className="ml-auto">
+            {user ? "Sync" : "Local"}
+          </Badge>
         </div>
       </SidebarFooter>
       <SidebarRail />

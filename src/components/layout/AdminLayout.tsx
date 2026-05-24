@@ -10,8 +10,8 @@ export function AdminLayout() {
         <AdminSidebar />
         <div className="relative flex-1 min-w-0">
           <BreadcrumbHeader />
-          <div className="absolute inset-0 top-14 overflow-auto">
-            <main className="w-full p-4 md:p-6">
+          <div className="absolute inset-0 top-14 overflow-auto bg-background">
+            <main className="w-full p-4 md:p-6 xl:p-8">
               <Outlet />
             </main>
           </div>
