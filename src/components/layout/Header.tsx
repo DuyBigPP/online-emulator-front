@@ -1,142 +1,62 @@
-import type React from "react"
-import { useLocation, Link } from "react-router-dom"
-import { ChevronRight, Gamepad2, LogOut, UserRound } from "lucide-react"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { menuItems } from "@/config/menu"
-import { useEmulator } from "@/context/EmulatorContext"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { Link, useLocation } from "react-router-dom"
+import { Gamepad2, LogOut, UserRound, Wifi, WifiOff } from "lucide-react"
 import { AuthDialog } from "@/components/layout/AuthDialog"
-
-interface BreadcrumbItem {
-  label: string
-  path: string
-  icon?: React.ReactNode
-}
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { getConsoleInfo } from "@/config/systems"
+import { useEmulator } from "@/context/EmulatorContext"
+import { menuItems } from "@/config/menu"
 
 export function BreadcrumbHeader() {
   const location = useLocation()
-  const breadcrumbs = generateBreadcrumbs(location.pathname)
+  const current = menuItems.find((item) => item.path === location.pathname) ?? menuItems[0]
   const { selectedGame, user, logout } = useEmulator()
+  const system = selectedGame ? getConsoleInfo(selectedGame.console) : null
 
   return (
-    <header className="flex h-14 items-center justify-between gap-3 border-b border-border bg-background px-4 lg:px-6 shrink-0">
-      <div className="flex h-full min-w-0 items-center gap-3">
-        <SidebarTrigger />
-        <div data-orientation="vertical" className="shrink-0 bg-border w-[1px] h-4"></div>
-
-        <nav className="flex min-w-0 items-center text-sm">
-          <ol className="flex items-center gap-1">
-            {/* <li>
-              <Link
-                to="/"
-                className="flex h-9 items-center gap-1.5 rounded-md px-2 text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <Home className="h-4 w-4" />
-                <span className="sr-only sm:not-sr-only sm:inline">Home</span>
-              </Link>
-            </li> */}
-
-            {breadcrumbs.map((item, index) => (
-              <li key={item.path} className="flex items-center gap-1">
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                {index === breadcrumbs.length - 1 ? (
-                  <span className="flex h-9 items-center gap-1.5 rounded-md px-2 font-medium text-foreground">
-                    {item.icon}
-                    {item.label}
-                  </span>
-                ) : (
-                  <Link
-                    to={item.path}
-                    className="flex h-9 items-center gap-1.5 rounded-md px-2 text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    {item.icon}
-                    <span className="hidden md:inline">{item.label}</span>
-                  </Link>
-                )}
-              </li>
-            ))}
-          </ol>
-        </nav>
-      </div>
-      <div className="flex min-w-0 items-center gap-2">
-        {selectedGame ? (
-          <Badge variant="outline" className="hidden max-w-[260px] gap-1 truncate sm:inline-flex">
-            <Gamepad2 className="size-3" />
-            <span className="truncate">{selectedGame.displayName}</span>
+    <header className="sticky top-0 z-40 border-b bg-background/78 px-3 py-2 backdrop-blur-xl md:px-5">
+      <div className="flex h-12 items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <Link to="/library" className="control-face flex size-10 shrink-0 items-center justify-center text-primary md:hidden">
+            <Gamepad2 className="size-5" />
+          </Link>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <span className="text-primary">{current?.icon}</span>
+              <span>{current?.label ?? "ROM Deck"}</span>
+            </div>
+            <div className="mt-0.5 max-w-[52vw] truncate text-xs text-muted-foreground sm:max-w-[420px]">
+              {selectedGame && system ? `${selectedGame.displayName} - ${system.label}` : "Insert a local ROM to start playing"}
+            </div>
+          </div>
+        </div>
+        <div className="flex min-w-0 items-center gap-2">
+          {selectedGame && system ? (
+            <Badge variant="outline" className="hidden max-w-[280px] gap-1.5 truncate bg-card/70 sm:inline-flex">
+              <span className={`size-2 rounded-full ${system.accent}`} />
+              <span className="truncate">{selectedGame.console}</span>
+            </Badge>
+          ) : null}
+          <Badge variant={user ? "default" : "outline"} className="hidden gap-1.5 sm:inline-flex">
+            {user ? <Wifi className="size-3" /> : <WifiOff className="size-3" />}
+            {user ? "Cloud" : "Local"}
           </Badge>
-        ) : null}
-        {user ? (
-          <Button size="sm" variant="outline" onClick={() => void logout()}>
-            <LogOut className="size-4" />
-            <span className="hidden sm:inline">Logout</span>
-          </Button>
-        ) : (
-          <AuthDialog>
-            <Button size="sm">
-              <UserRound className="size-4" />
-              <span className="hidden sm:inline">Login</span>
+          {user ? (
+            <Button size="sm" variant="outline" onClick={() => void logout()}>
+              <LogOut className="size-4" />
+              <span className="hidden sm:inline">Logout</span>
             </Button>
-          </AuthDialog>
-        )}
+          ) : (
+            <AuthDialog>
+              <Button size="sm">
+                <UserRound className="size-4" />
+                <span className="hidden sm:inline">Login</span>
+              </Button>
+            </AuthDialog>
+          )}
+        </div>
       </div>
     </header>
   )
 }
 
-function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
-  // Split the pathname into segments
-  const paths = pathname.split("/").filter(Boolean)
-  if (paths.length === 0) return []
-
-  const breadcrumbs: BreadcrumbItem[] = []
-  let currentPath = ""
-  
-  // Lưu trữ đường dẫn đã xử lý để tránh lặp lại item
-  const processedPaths = new Set<string>()
-
-  paths.forEach((segment) => {
-    currentPath += `/${segment}`
-    
-    // Bỏ qua nếu đường dẫn này đã được xử lý
-    if (processedPaths.has(currentPath)) {
-      return
-    }
-    
-    // Đánh dấu đường dẫn đã được xử lý
-    processedPaths.add(currentPath)
-
-    // Find matching menu item
-    const menuItem = findMenuItemByPath(currentPath)
-    if (menuItem) {
-      // Nếu đây là menu cha có children, thêm vào với đúng đường dẫn của nó
-      // mà không tự động chuyển hướng đến submenu đầu tiên
-      breadcrumbs.push({
-        label: menuItem.label,
-        path: menuItem.path,
-        icon: menuItem.icon,
-      })
-    } else {
-      // For paths not defined in the menu, create a formatted label.
-      breadcrumbs.push({
-        label: formatBreadcrumbLabel(segment),
-        path: currentPath,
-      })
-    }
-  })
-
-  return breadcrumbs
-}
-
-function findMenuItemByPath(path: string) {
-  // Search through the menu items for a matching path.
-  return menuItems.find((item) => item.path === path)
-}
-
-function formatBreadcrumbLabel(segment: string): string {
-  // Convert kebab-case or camelCase to Title Case with spaces.
-  return segment
-    .replace(/-/g, " ")
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/\b\w/g, (char) => char.toUpperCase())
-}

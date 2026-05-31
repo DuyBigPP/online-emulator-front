@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
-import { CloudUpload, Disc3, Gamepad2, Maximize2, Play, Power, Square } from "lucide-react"
+import { CloudUpload, Disc3, Gamepad2, Maximize2, MonitorUp, Power, RotateCcw, Square } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { DsDualScreenWindows } from "@/components/emulator/DsDualScreenWindows"
+import { EmulatorPlayerFrame } from "@/components/emulator/EmulatorPlayerFrame"
+import { FloatingEmulatorLayer, FloatingEmulatorWindow } from "@/components/emulator/FloatingEmulatorWindow"
 import { TouchControls } from "@/components/emulator/TouchControls"
 import { EMULATORJS_DATA_URL, EMULATORJS_LOADER_URL } from "@/config/env"
 import { getConsoleInfo } from "@/config/systems"
 import { useEmulator } from "@/context/EmulatorContext"
+import { useFloatingLayout } from "@/hooks/use-floating-layout"
 import { useTouchDevice } from "@/hooks/use-touch-device"
 import { api } from "@/lib/api"
 import {
@@ -22,6 +26,18 @@ import {
   type ControlProfile,
 } from "@/lib/controls"
 
+const DS_PERFORMANCE_OPTIONS = {
+  melonds_threaded_renderer: "enabled",
+  melonds_jit_enable: "enabled",
+  melonds_jit_fast_memory: "enabled",
+  melonds_jit_branch_optimisations: "enabled",
+  melonds_jit_literal_optimisations: "enabled",
+  melonds_screen_gap: "0",
+  melonds_opengl_renderer: "disabled",
+  melonds_opengl_resolution: "1x native (256x192)",
+  melonds_opengl_filtering: "nearest",
+}
+
 const buildEmulatorDocument = (
   gameUrl: string,
   core: string,
@@ -29,6 +45,8 @@ const buildEmulatorDocument = (
   dataUrl: string,
   loaderUrl: string,
   controls: ReturnType<typeof toEmulatorJsControls>,
+  preferThreads: boolean,
+  defaultOptions: Record<string, string>,
   loadStateUrl?: string,
 ) => `<!doctype html>
 <html>
@@ -54,7 +72,9 @@ const buildEmulatorDocument = (
       window.EJS_gameUrl = ${JSON.stringify(gameUrl)};
       window.EJS_pathtodata = ${JSON.stringify(dataUrl)};
       window.EJS_startOnLoaded = true;
+      window.EJS_threads = ${JSON.stringify(preferThreads)} && typeof SharedArrayBuffer !== "undefined";
       window.EJS_defaultControls = ${JSON.stringify(controls)};
+      window.EJS_defaultOptions = ${JSON.stringify(defaultOptions)};
       ${loadStateUrl ? `window.EJS_loadStateURL = ${JSON.stringify(loadStateUrl)};` : ""}
     </script>
     <script src=${JSON.stringify(loaderUrl)}></script>
@@ -73,6 +93,9 @@ export default function PlayPage() {
   const [savingCloud, setSavingCloud] = useState(false)
   const [profileId, setProfileId] = useState<string | null>(null)
   const [touchControlsEnabled, setTouchControlsEnabled] = useState(true)
+  const [floatingWindows, setFloatingWindows] = useState(() => localStorage.getItem("rom-deck-floating-enabled") === "true")
+  const [sharedArrayBufferReady, setSharedArrayBufferReady] = useState(false)
+  const { layouts, setLayout, resetLayouts } = useFloatingLayout()
 
   useEffect(() => {
     setRunning(false)
@@ -87,11 +110,26 @@ export default function PlayPage() {
     }
   }, [gameUrl, loadStateUrl])
 
+  useEffect(() => {
+    localStorage.setItem("rom-deck-floating-enabled", String(floatingWindows))
+  }, [floatingWindows])
+
+  useEffect(() => {
+    document.body.dataset.emulatorRunning = running ? "true" : "false"
+    document.body.dataset.emulatorSystem = running && selectedGame?.console ? selectedGame.console.toLowerCase() : ""
+    return () => {
+      delete document.body.dataset.emulatorRunning
+      delete document.body.dataset.emulatorSystem
+    }
+  }, [running, selectedGame?.console])
+
+  useEffect(() => {
+    setSharedArrayBufferReady(typeof SharedArrayBuffer !== "undefined" && window.crossOriginIsolated)
+  }, [])
+
   const system = selectedGame ? getConsoleInfo(selectedGame.console) : null
-  const profiles = useMemo(
-    () => (selectedGame ? getControlProfiles(selectedGame.console) : []),
-    [selectedGame],
-  )
+  const isDs = selectedGame?.console === "DS"
+  const profiles = useMemo(() => (selectedGame ? getControlProfiles(selectedGame.console) : []), [selectedGame])
   const activeProfile = useMemo<ControlProfile | null>(() => {
     if (!selectedGame) return null
     return profiles.find((profile) => profile.id === (profileId ?? getActiveProfileId(selectedGame.console))) ?? getActiveControlProfile(selectedGame.console)
@@ -111,9 +149,11 @@ export default function PlayPage() {
       EMULATORJS_DATA_URL,
       EMULATORJS_LOADER_URL,
       toEmulatorJsControls(activeProfile),
+      isDs,
+      isDs ? DS_PERFORMANCE_OPTIONS : {},
       loadStateUrl ?? undefined,
     )
-  }, [activeProfile, gameUrl, loadStateUrl, selectedGame, system])
+  }, [activeProfile, gameUrl, isDs, loadStateUrl, selectedGame, system])
 
   const changeProfile = (id: string) => {
     if (!selectedGame) return
@@ -128,9 +168,7 @@ export default function PlayPage() {
 
     let nextLoadStateUrl: string | null = null
     if (user) {
-      const cloudGame = cloudGames.find(
-        (game) => game.console === selectedGame.console && game.sha256 === selectedGame.sha256,
-      )
+      const cloudGame = cloudGames.find((game) => game.console === selectedGame.console && game.sha256 === selectedGame.sha256)
       const latestState = cloudGame
         ? cloudSaves
             .filter((save) => save.gameProfileId === cloudGame.id && save.kind === "STATE")
@@ -168,6 +206,33 @@ export default function PlayPage() {
     await screenRef.current?.requestFullscreen()
   }
 
+  const changeFloatingWindows = (enabled: boolean) => {
+    if (running) {
+      toast.error("Power off before changing window mode")
+      return
+    }
+
+    setFloatingWindows(enabled)
+  }
+
+  const playerFrame = (
+    <EmulatorPlayerFrame iframeRef={iframeRef} screenRef={screenRef} running={running} iframeDoc={iframeDoc}>
+      <TouchControls
+        bindings={activeProfile?.bindings ?? []}
+        targetWindow={iframeRef.current?.contentWindow ?? null}
+        enabled={isTouchDevice && touchControlsEnabled}
+      />
+    </EmulatorPlayerFrame>
+  )
+
+  const dockedStageClassName = isDs
+    ? "relative mx-auto mt-2 h-[min(72dvh,640px)] min-h-[380px] w-full max-w-[480px] overflow-hidden rounded-lg bg-black sm:min-h-[460px] xl:mt-3"
+    : "relative mt-2 h-[44vh] min-h-[260px] overflow-hidden rounded-lg bg-black sm:h-[58vh] sm:min-h-[340px] xl:mt-3 xl:h-[min(72vh,calc((100vw-28rem)*0.72))]"
+
+  const stageClassName = floatingWindows
+    ? "relative mt-2 grid h-[160px] sm:mt-3 sm:h-[220px] place-items-center rounded-lg border border-dashed bg-black text-center text-sm text-white/70"
+    : dockedStageClassName
+
   const saveStateToCloud = async () => {
     if (!user) {
       toast.error("Login required for cloud save")
@@ -195,12 +260,7 @@ export default function PlayPage() {
       return
     }
 
-    const bytes =
-      state instanceof Uint8Array
-        ? state
-        : state instanceof ArrayBuffer
-          ? new Uint8Array(state)
-          : Uint8Array.from(state)
+    const bytes = state instanceof Uint8Array ? state : state instanceof ArrayBuffer ? new Uint8Array(state) : Uint8Array.from(state)
 
     setSavingCloud(true)
     try {
@@ -217,12 +277,7 @@ export default function PlayPage() {
           })
         ).game
 
-      await api.saves.upload(
-        cloudGame.id,
-        Number(stateSlot),
-        new Blob([bytes], { type: "application/octet-stream" }),
-        "STATE",
-      )
+      await api.saves.upload(cloudGame.id, Number(stateSlot), new Blob([bytes], { type: "application/octet-stream" }), "STATE")
       await refreshCloud()
       toast.success(`Saved state to cloud slot ${stateSlot}`)
     } catch (error) {
@@ -233,16 +288,16 @@ export default function PlayPage() {
   }
 
   return (
-    <div className="grid min-h-[calc(100vh-7rem)] gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-      <aside className="space-y-4">
-        <Card className="rounded-lg py-5">
-          <CardHeader className="px-5">
+    <div className="grid min-h-[calc(100vh-7rem)] gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <aside className="order-2 space-y-3 xl:order-1">
+        <Card className="console-panel overflow-hidden py-0">
+          <CardHeader className="border-b border-white/10 bg-white/[0.025] cartridge-notch px-4 py-3 sm:px-5 sm:py-4">
             <CardTitle className="flex items-center gap-2 text-base">
               <Disc3 className="size-4 text-primary" />
-              Insert ROM
+              Cartridge control
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 px-5">
+          <CardContent className="space-y-3 p-4 sm:space-y-4 sm:p-5">
             {localGames.length ? (
               <Select value={selectedGame?.localId} onValueChange={(value) => void selectGame(value)}>
                 <SelectTrigger className="w-full">
@@ -261,8 +316,9 @@ export default function PlayPage() {
                 <Link to="/library">Add ROM</Link>
               </Button>
             )}
+
             {selectedGame && system ? (
-              <div className="space-y-3 rounded-md border p-3">
+              <div className="space-y-3 rounded-lg border bg-background/50 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{selectedGame.displayName}</div>
@@ -270,48 +326,25 @@ export default function PlayPage() {
                   </div>
                   <span className={`size-3 rounded-full ${system.accent}`} />
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-2 sm:text-xs">
                   <Badge variant="secondary">{selectedGame.console}</Badge>
-                  <Badge variant="outline">{selectedGame.fileSize > 0 ? "Ready" : "Empty"}</Badge>
+                  <Badge variant={running ? "default" : "outline"}>{running ? "Running" : "Ready"}</Badge>
                 </div>
               </div>
             ) : null}
-            <Button className="w-full" disabled={!selectedGame} onClick={() => void start()}>
-              <Power className="size-4" />
-              Power on
-            </Button>
-            {selectedGame && activeProfile ? (
-              <div className="space-y-2 rounded-md border p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium">Control profile</span>
-                  <Badge variant={activeProfile.device === "keyboard" ? "default" : "secondary"}>
-                    {activeProfile.device}
-                  </Badge>
-                </div>
-                <Select value={activeProfile.id} onValueChange={changeProfile}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {profiles.map((profile) => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        {profile.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
-            {isTouchDevice ? (
-              <div className="flex items-center justify-between rounded-md border p-3">
-                <div>
-                  <div className="text-sm font-medium">Touch controls</div>
-                  <div className="text-xs text-muted-foreground">Auto shown on mobile</div>
-                </div>
-                <Switch checked={touchControlsEnabled} onCheckedChange={setTouchControlsEnabled} />
-              </div>
-            ) : null}
-            <div className="grid grid-cols-[1fr_2fr] gap-2">
+
+            <div className="grid grid-cols-2 gap-2">
+              <Button className="min-w-0 text-xs sm:text-sm" disabled={!selectedGame || running} onClick={() => void start()}>
+                <Power className="size-4" />
+                Power on
+              </Button>
+              <Button className="min-w-0 text-xs sm:text-sm" variant="outline" disabled={!running} onClick={stop}>
+                <Square className="size-4" />
+                Power off
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_2fr]">
               <Select value={stateSlot} onValueChange={setStateSlot}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -329,70 +362,131 @@ export default function PlayPage() {
                 Save cloud
               </Button>
             </div>
-            <Button className="w-full" variant="outline" disabled={!running} onClick={stop}>
-              <Square className="size-4" />
-              Power off
-            </Button>
           </CardContent>
         </Card>
-        <Card className="rounded-lg py-5">
-          <CardHeader className="px-5">
-            <CardTitle className="text-base">Keyboard</CardTitle>
-          </CardHeader>
-          <CardContent className="px-5">
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              {activeProfile?.bindings.slice(0, 14).map((binding) => (
-                <div key={binding.index} className="flex items-center justify-between rounded-md border px-2 py-1.5">
-                  <span className="text-muted-foreground">{binding.label}</span>
-                  <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono">{binding.value}</kbd>
+
+        {selectedGame && activeProfile ? (
+          <Card className="console-panel overflow-hidden py-0">
+            <CardHeader className="border-b border-white/10 bg-white/[0.025] cartridge-notch px-4 py-3 sm:px-5 sm:py-4">
+              <CardTitle className="flex items-center justify-between gap-2 text-base">
+                <span>Input deck</span>
+                <Badge variant={activeProfile.device === "keyboard" ? "default" : "secondary"}>{activeProfile.device}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 p-4 sm:space-y-4 sm:p-5">
+              <Select value={activeProfile.id} onValueChange={changeProfile}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {profiles.map((profile) => (
+                    <SelectItem key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isTouchDevice ? (
+                <div className="flex items-center justify-between rounded-lg border bg-background/55 p-3">
+                  <div>
+                    <div className="text-sm font-medium">Touch controls</div>
+                    <div className="text-xs text-muted-foreground">Auto shown on mobile</div>
+                  </div>
+                  <Switch checked={touchControlsEnabled} onCheckedChange={setTouchControlsEnabled} />
                 </div>
-              ))}
-            </div>
-            <p className="mt-3 text-xs text-muted-foreground">Edit profiles in Settings. Choose profile before Power on.</p>
-          </CardContent>
-        </Card>
+              ) : null}
+              <div className="grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-2 sm:text-xs">
+                {activeProfile.bindings.slice(0, 14).map((binding) => (
+                  <div key={binding.index} className="flex min-w-0 items-center justify-between gap-2 rounded-lg border bg-background/55 px-2 py-1.5">
+                    <span className="text-muted-foreground">{binding.label}</span>
+                    <kbd className="max-w-[96px] truncate rounded bg-muted px-1.5 py-0.5 font-mono">{binding.value}</kbd>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">Edit profiles in Settings. Choose profile before Power on.</p>
+            </CardContent>
+          </Card>
+        ) : null}
       </aside>
 
-      <section className="rounded-lg border bg-card p-3 shadow-sm">
-        <div className="mb-3 flex items-center justify-between gap-3">
+      <section className="console-panel emulator-stage order-1 overflow-hidden p-2 xl:order-2 xl:sticky xl:top-4 xl:self-start xl:p-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-2">
-            <Gamepad2 className="size-4 text-primary" />
-            <span className="truncate text-sm font-medium">{selectedGame?.displayName ?? "No cartridge"}</span>
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <Gamepad2 className="size-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-medium">{selectedGame?.displayName ?? "No cartridge"}</div>
+              <div className="text-xs text-muted-foreground">{floatingWindows ? "Floating window station" : "Docked emulator stage"}</div>
+            </div>
           </div>
-          <Button variant="outline" size="sm" disabled={!running} onClick={() => void fullscreen()}>
-            <Maximize2 className="size-4" />
-            <span className="hidden sm:inline">Fullscreen</span>
-          </Button>
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:items-center">
+            <div className="flex items-center gap-2 rounded-lg border bg-background/60 px-3 py-1.5">
+              <MonitorUp className="size-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Floating</span>
+              <Switch checked={floatingWindows} onCheckedChange={changeFloatingWindows} />
+            </div>
+            {isDs ? (
+              <Badge variant={sharedArrayBufferReady ? "default" : "secondary"} className="justify-center">
+                DS threads {sharedArrayBufferReady ? "on" : "off"}
+              </Badge>
+            ) : null}
+            {floatingWindows ? (
+              <Button variant="outline" size="sm" onClick={resetLayouts}>
+                <RotateCcw className="size-4" />
+                <span className="hidden sm:inline">Reset</span>
+              </Button>
+            ) : null}
+            <Button variant="outline" size="sm" disabled={!running} onClick={() => void fullscreen()}>
+              <Maximize2 className="size-4" />
+              <span className="hidden sm:inline">Fullscreen</span>
+            </Button>
+          </div>
         </div>
-        <div ref={screenRef} className="relative aspect-[4/3] min-h-[320px] overflow-hidden rounded-md border bg-black">
-          {running && iframeDoc ? (
+        <div
+          className={stageClassName}
+        >
+          {floatingWindows && selectedGame?.console === "DS" && running && iframeDoc ? (
             <>
-              <iframe
-                ref={iframeRef}
-                title="Emulator player"
-                srcDoc={iframeDoc}
-                className="h-full w-full border-0"
-                allow="gamepad; fullscreen; autoplay"
-              />
-              <TouchControls
-                bindings={activeProfile?.bindings ?? []}
-                targetWindow={iframeRef.current?.contentWindow ?? null}
-                enabled={isTouchDevice && touchControlsEnabled}
-              />
+              <span>Floating DS windows are active.</span>
+              <FloatingEmulatorLayer>
+                <DsDualScreenWindows
+                  iframeRef={iframeRef}
+                  running={running}
+                  sourceFrame={playerFrame}
+                  layouts={layouts}
+                  onLayoutChange={setLayout}
+                  onReset={resetLayouts}
+                />
+              </FloatingEmulatorLayer>
+            </>
+          ) : floatingWindows ? (
+            <>
+              <span>Floating emulator window is active.</span>
+              <FloatingEmulatorLayer>
+                <FloatingEmulatorWindow
+                  title={selectedGame?.displayName ?? "Emulator"}
+                  layout={layouts.single}
+                  minWidth={420}
+                  minHeight={315}
+                  onLayoutChange={(layout) => setLayout("single", layout)}
+                  onFullscreen={fullscreen}
+                  onReset={resetLayouts}
+                  onClose={running ? undefined : () => setFloatingWindows(false)}
+                >
+                  {playerFrame}
+                </FloatingEmulatorWindow>
+              </FloatingEmulatorLayer>
             </>
           ) : (
-            <div className="grid h-full place-items-center p-6 text-center text-white">
-              <div>
-                <div className="mx-auto flex size-14 items-center justify-center rounded-md border border-white/20 bg-white/10">
-                  <Play className="size-6" />
-                </div>
-                <h1 className="mt-4 text-xl font-semibold">Ready when ROM inserted</h1>
-                <p className="mt-2 text-sm text-white/70">Select a local ROM and power on.</p>
-              </div>
-            </div>
+            playerFrame
           )}
         </div>
       </section>
     </div>
   )
 }
+
+
+
+

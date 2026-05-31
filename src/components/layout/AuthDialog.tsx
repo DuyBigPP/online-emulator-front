@@ -44,7 +44,7 @@ export function AuthDialog({ children }: { children: React.ReactNode }) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Cloud sync</DialogTitle>
-          <DialogDescription>Dang nhap de dong bo metadata va savefile.</DialogDescription>
+          <DialogDescription>Sign in to sync metadata and savefiles.</DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="login">
           <TabsList className="grid w-full grid-cols-2">

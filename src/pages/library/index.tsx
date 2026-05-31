@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { toast } from "sonner"
-import { Cloud, Gamepad2, Play, Plus, Trash2, Upload } from "lucide-react"
+import { Cloud, Gamepad2, HardDrive, Play, Plus, ShieldCheck, Trash2, Upload } from "lucide-react"
+import { EmptyState, MetricTile, PageHeader } from "@/components/app/PageShell"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,6 +25,7 @@ export default function LibraryPage() {
 
   const consoleInfo = getConsoleInfo(consoleSystem)
   const syncedHashes = useMemo(() => new Set(cloudGames.map((game) => `${game.console}:${game.sha256}`)), [cloudGames])
+  const localBytes = localGames.reduce((total, game) => total + game.fileSize, 0)
 
   const handleFiles = async (files: FileList | null) => {
     if (!files?.length) return
@@ -32,13 +34,13 @@ export default function LibraryPage() {
     try {
       for (const file of Array.from(files)) {
         if (!isValidRomFile(file.name, consoleSystem)) {
-          toast.error(`${file.name} khong dung dinh dang ${consoleInfo.label}`)
+          toast.error(`${file.name} is not a valid ${consoleInfo.label} ROM`)
           continue
         }
 
         const game = await createLocalGame(file, consoleSystem)
         await addLocalGame(game)
-        toast.success(`${game.displayName} da vao library`)
+        toast.success(`${game.displayName} added to library`)
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Upload failed")
@@ -49,89 +51,65 @@ export default function LibraryPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="rounded-lg border bg-card p-5 shadow-sm">
-          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <Gamepad2 className="size-5 text-primary" />
-                <h1 className="text-2xl font-semibold tracking-normal">ROM Library</h1>
-              </div>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                ROM stays in this browser. Backend only receives metadata and savefiles.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Select value={consoleSystem} onValueChange={(value) => setConsoleSystem(value as ConsoleSystem)}>
-                <SelectTrigger className="w-full sm:w-[210px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CONSOLES.map((system) => (
-                    <SelectItem key={system.id} value={system.id}>
-                      {system.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button onClick={() => inputRef.current?.click()} disabled={uploading}>
-                <Upload className="size-4" />
-                Add ROM
-              </Button>
-              <Input
-                ref={inputRef}
-                type="file"
-                multiple
-                className="hidden"
-                accept={consoleInfo.extensions.join(",")}
-                onChange={(event) => void handleFiles(event.target.files)}
-              />
-            </div>
-          </div>
-        </div>
-        <Card className="rounded-lg py-5">
-          <CardHeader className="px-5">
-            <CardTitle className="text-base">Console slot</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 px-5">
-            <div className="flex items-center justify-between rounded-md border p-3">
-              <div>
-                <div className="text-sm font-medium">{consoleInfo.label}</div>
-                <div className="mt-1 text-xs text-muted-foreground">{consoleInfo.extensions.join(", ")}</div>
-              </div>
-              <span className={`size-3 rounded-full ${consoleInfo.accent}`} />
-            </div>
-            <div className="flex items-center justify-between rounded-md border p-3">
-              <div>
-                <div className="text-sm font-medium">Cloud sync</div>
-                <div className="mt-1 text-xs text-muted-foreground">{user ? user.email : "Login required"}</div>
-              </div>
-              <Badge variant={user ? "default" : "outline"}>{user ? "On" : "Off"}</Badge>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Cartridge bay"
+        title="ROM Library"
+        description="Add local Nintendo ROMs, pick a console, and launch them from the player. ROM files stay in this browser."
+        icon={<Gamepad2 className="size-5" />}
+        actions={
+          <>
+            <Select value={consoleSystem} onValueChange={(value) => setConsoleSystem(value as ConsoleSystem)}>
+              <SelectTrigger className="w-full sm:w-[220px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CONSOLES.map((system) => (
+                  <SelectItem key={system.id} value={system.id}>
+                    {system.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={() => inputRef.current?.click()} disabled={uploading}>
+              <Upload className="size-4" />
+              Add ROM
+            </Button>
+            <Input
+              ref={inputRef}
+              type="file"
+              multiple
+              className="hidden"
+              accept={consoleInfo.extensions.join(",")}
+              onChange={(event) => void handleFiles(event.target.files)}
+            />
+          </>
+        }
+      />
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricTile label="Local ROMs" value={String(localGames.length)} detail={formatBytes(localBytes)} icon={<HardDrive className="size-4" />} tone="primary" />
+        <MetricTile label="Cloud metadata" value={user ? "Online" : "Local"} detail={user?.email ?? "Login to sync"} icon={<Cloud className="size-4" />} />
+        <MetricTile label="Console slot" value={consoleInfo.id} detail={consoleInfo.label} icon={<Gamepad2 className="size-4" />} tone="accent" />
+        <MetricTile label="Privacy" value="Browser" detail="ROM files never upload" icon={<ShieldCheck className="size-4" />} />
       </section>
 
       {localGames.length === 0 ? (
-        <div className="grid min-h-[360px] place-items-center rounded-lg border border-dashed bg-card/50 p-8 text-center">
-          <div className="max-w-sm">
-            <div className="mx-auto flex size-12 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <Plus className="size-5" />
-            </div>
-            <h2 className="mt-4 text-lg font-semibold">Library empty</h2>
-            <p className="mt-2 text-sm text-muted-foreground">Pick a console, add a ROM, then launch from Play.</p>
-          </div>
-        </div>
+        <EmptyState
+          icon={<Plus className="size-5" />}
+          title="Library empty"
+          description="Pick a console, add a ROM file, then boot it from Play."
+          action={<Button onClick={() => inputRef.current?.click()}>Add first ROM</Button>}
+        />
       ) : (
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {localGames.map((game) => {
             const synced = syncedHashes.has(`${game.console}:${game.sha256}`)
             const system = getConsoleInfo(game.console)
 
             return (
-              <Card key={game.localId} className="rounded-lg py-5">
-                <CardHeader className="px-5">
+              <Card key={game.localId} className="overflow-hidden console-panel py-0">
+                <CardHeader className="border-b border-white/10 bg-white/[0.025] cartridge-notch px-5 py-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <CardTitle className="truncate text-base">{game.displayName}</CardTitle>
@@ -146,14 +124,14 @@ export default function LibraryPage() {
                     <span className={`mt-1 size-3 rounded-full ${system.accent}`} />
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4 px-5">
+                <CardContent className="space-y-4 p-5">
                   <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="rounded-md border p-3">
-                      <div className="text-muted-foreground">File</div>
+                    <div className="rounded-lg border bg-background/55 p-3">
+                      <div className="text-xs text-muted-foreground">File</div>
                       <div className="mt-1 truncate font-medium">{game.fileName}</div>
                     </div>
-                    <div className="rounded-md border p-3">
-                      <div className="text-muted-foreground">Size</div>
+                    <div className="rounded-lg border bg-background/55 p-3">
+                      <div className="text-xs text-muted-foreground">Size</div>
                       <div className="mt-1 font-medium">{formatBytes(game.fileSize)}</div>
                     </div>
                   </div>
@@ -177,3 +155,4 @@ export default function LibraryPage() {
     </div>
   )
 }
+

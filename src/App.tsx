@@ -5,7 +5,7 @@ import { EmulatorProvider } from "@/context/EmulatorContext"
 
 function App() {
   return (
-    <ThemeProvider defaultTheme="system" storageKey="app-theme">
+    <ThemeProvider defaultTheme="dark" storageKey="app-theme">
       <EmulatorProvider>
         <AdminRoutes />
         <Toaster richColors position="top-right" />

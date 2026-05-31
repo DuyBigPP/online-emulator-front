@@ -104,14 +104,14 @@ export function EmulatorProvider({ children }: { children: React.ReactNode }) {
     const response = await api.auth.login({ email, password })
     setUser(response.user)
     await syncLocalGamesToCloud(localGames)
-    toast.success("Da dang nhap")
+    toast.success("Signed in")
   }, [localGames, syncLocalGamesToCloud])
 
   const register = useCallback(async (email: string, password: string, displayName?: string) => {
     const response = await api.auth.register({ email, password, displayName })
     setUser(response.user)
     await syncLocalGamesToCloud(localGames)
-    toast.success("Tai khoan da san sang")
+    toast.success("Account ready")
   }, [localGames, syncLocalGamesToCloud])
 
   const logout = useCallback(async () => {
@@ -119,7 +119,7 @@ export function EmulatorProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
     setCloudGames([])
     setCloudSaves([])
-    toast.success("Da dang xuat")
+    toast.success("Signed out")
   }, [])
 
   const addLocalGame = useCallback(
