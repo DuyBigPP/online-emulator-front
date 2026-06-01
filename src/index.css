@@ -182,13 +182,16 @@
   body[data-emulator-running="true"] .app-grain::after {
     display: none;
   }
+  body[data-emulator-running="true"] .app-grain::before {
+    display: none;
+  }
+  body[data-emulator-running="true"] {
+    background: var(--background);
+  }
   body[data-emulator-running="true"] .console-panel,
   body[data-emulator-running="true"] .metric-plate,
   body[data-emulator-running="true"] .cartridge-tile {
     backdrop-filter: none;
-  }
-  body[data-emulator-running="true"] .app-grain::before {
-    background: linear-gradient(180deg, color-mix(in oklch, var(--background) 92%, white 3%), var(--background));
   }
   body[data-emulator-running="true"] button,
   body[data-emulator-running="true"] a,
@@ -197,11 +200,21 @@
   body[data-emulator-running="true"] textarea {
     transition-duration: 0ms;
   }
-  body[data-emulator-system="ds"] .console-panel:not(.emulator-stage) {
-    box-shadow: none;
+  body[data-emulator-running="true"] header.sticky-app-header {
+    position: static;
+    background: var(--background);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
-  body[data-emulator-system="ds"] .emulator-stage {
-    contain: layout paint style;
-    box-shadow: none;
-  }
+}
+
+.emulator-stage {
+  contain: layout paint style;
+}
+
+body[data-emulator-system="ds"] .console-panel:not(.emulator-stage) {
+  box-shadow: none;
+}
+body[data-emulator-system="ds"] .emulator-stage {
+  box-shadow: none;
 }

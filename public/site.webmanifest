@@ -1,0 +1,19 @@
+{
+  "name": "ROM Deck — Online Emulator",
+  "short_name": "ROM Deck",
+  "description": "Browser Nintendo ROM Emulator for DS, GBA, GBC, GB, N64, SNES, NES",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0e1a25",
+  "theme_color": "#0e1a25",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

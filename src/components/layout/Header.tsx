@@ -14,7 +14,7 @@ export function BreadcrumbHeader() {
   const system = selectedGame ? getConsoleInfo(selectedGame.console) : null
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/78 px-3 py-2 backdrop-blur-xl md:px-5">
+    <header className="sticky-app-header sticky top-0 z-40 border-b bg-background/78 px-3 py-2 backdrop-blur-xl md:px-5">
       <div className="flex h-12 items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <Link to="/library" className="control-face flex size-10 shrink-0 items-center justify-center text-primary md:hidden">

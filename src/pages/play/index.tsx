@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { DsDualScreenWindows } from "@/components/emulator/DsDualScreenWindows"
 import { EmulatorPlayerFrame } from "@/components/emulator/EmulatorPlayerFrame"
 import { FloatingEmulatorLayer, FloatingEmulatorWindow } from "@/components/emulator/FloatingEmulatorWindow"
 import { TouchControls } from "@/components/emulator/TouchControls"
@@ -33,9 +32,11 @@ const DS_PERFORMANCE_OPTIONS = {
   melonds_jit_branch_optimisations: "enabled",
   melonds_jit_literal_optimisations: "enabled",
   melonds_screen_gap: "0",
-  melonds_opengl_renderer: "disabled",
+  melonds_opengl_renderer: "enabled",
   melonds_opengl_resolution: "1x native (256x192)",
   melonds_opengl_filtering: "nearest",
+  melonds_frameskip: "1",
+  melonds_frame_rate: "60",
 }
 
 const buildEmulatorDocument = (
@@ -72,7 +73,7 @@ const buildEmulatorDocument = (
       window.EJS_gameUrl = ${JSON.stringify(gameUrl)};
       window.EJS_pathtodata = ${JSON.stringify(dataUrl)};
       window.EJS_startOnLoaded = true;
-      window.EJS_threads = ${JSON.stringify(preferThreads)} && typeof SharedArrayBuffer !== "undefined";
+      window.EJS_threads = ${JSON.stringify(preferThreads)} && window.crossOriginIsolated === true;
       window.EJS_defaultControls = ${JSON.stringify(controls)};
       window.EJS_defaultOptions = ${JSON.stringify(defaultOptions)};
       ${loadStateUrl ? `window.EJS_loadStateURL = ${JSON.stringify(loadStateUrl)};` : ""}
@@ -92,7 +93,7 @@ export default function PlayPage() {
   const [stateSlot, setStateSlot] = useState("1")
   const [savingCloud, setSavingCloud] = useState(false)
   const [profileId, setProfileId] = useState<string | null>(null)
-  const [touchControlsEnabled, setTouchControlsEnabled] = useState(true)
+  const [touchControlsEnabled, setTouchControlsEnabled] = useState(false)
   const [floatingWindows, setFloatingWindows] = useState(() => localStorage.getItem("rom-deck-floating-enabled") === "true")
   const [sharedArrayBufferReady, setSharedArrayBufferReady] = useState(false)
   const { layouts, setLayout, resetLayouts } = useFloatingLayout()
@@ -389,8 +390,8 @@ export default function PlayPage() {
               {isTouchDevice ? (
                 <div className="flex items-center justify-between rounded-lg border bg-background/55 p-3">
                   <div>
-                    <div className="text-sm font-medium">Touch controls</div>
-                    <div className="text-xs text-muted-foreground">Auto shown on mobile</div>
+                    <div className="text-sm font-medium">Custom touch controls</div>
+                    <div className="text-xs text-muted-foreground">Off — EmulatorJS shows its own</div>
                   </div>
                   <Switch checked={touchControlsEnabled} onCheckedChange={setTouchControlsEnabled} />
                 </div>
@@ -446,30 +447,16 @@ export default function PlayPage() {
         <div
           className={stageClassName}
         >
-          {floatingWindows && selectedGame?.console === "DS" && running && iframeDoc ? (
-            <>
-              <span>Floating DS windows are active.</span>
-              <FloatingEmulatorLayer>
-                <DsDualScreenWindows
-                  iframeRef={iframeRef}
-                  running={running}
-                  sourceFrame={playerFrame}
-                  layouts={layouts}
-                  onLayoutChange={setLayout}
-                  onReset={resetLayouts}
-                />
-              </FloatingEmulatorLayer>
-            </>
-          ) : floatingWindows ? (
+          {floatingWindows ? (
             <>
               <span>Floating emulator window is active.</span>
               <FloatingEmulatorLayer>
                 <FloatingEmulatorWindow
                   title={selectedGame?.displayName ?? "Emulator"}
-                  layout={layouts.single}
-                  minWidth={420}
-                  minHeight={315}
-                  onLayoutChange={(layout) => setLayout("single", layout)}
+                  layout={isDs ? layouts.dsSingle : layouts.single}
+                  minWidth={isDs ? 256 : 420}
+                  minHeight={isDs ? 384 : 315}
+                  onLayoutChange={(layout) => setLayout(isDs ? "dsSingle" : "single", layout)}
                   onFullscreen={fullscreen}
                   onReset={resetLayouts}
                   onClose={running ? undefined : () => setFloatingWindows(false)}

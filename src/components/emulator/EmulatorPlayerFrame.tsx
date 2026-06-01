@@ -25,7 +25,7 @@ export function EmulatorPlayerFrame({
             title="Emulator player"
             srcDoc={iframeDoc}
             tabIndex={0}
-            className="h-full w-full border-0"
+            className="h-full w-full border-0 touch-none"
             allow="cross-origin-isolated; gamepad; fullscreen; autoplay"
           />
           {children}

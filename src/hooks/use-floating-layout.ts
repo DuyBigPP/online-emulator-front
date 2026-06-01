@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 
-export type FloatingWindowId = "single" | "dsTop" | "dsBottom"
+export type FloatingWindowId = "single" | "dsTop" | "dsBottom" | "dsSingle"
 
 export type FloatingWindowLayout = {
   x: number
@@ -17,6 +17,7 @@ const DEFAULT_LAYOUTS: FloatingLayouts = {
   single: { x: 360, y: 140, width: 720, height: 540 },
   dsTop: { x: 340, y: 120, width: 512, height: 384 },
   dsBottom: { x: 880, y: 180, width: 384, height: 288 },
+  dsSingle: { x: 360, y: 120, width: 480, height: 720 },
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
@@ -61,6 +62,7 @@ export const useFloatingLayout = () => {
       single: clampLayout(layouts.single, viewport.width, viewport.height),
       dsTop: clampLayout(layouts.dsTop, viewport.width, viewport.height),
       dsBottom: clampLayout(layouts.dsBottom, viewport.width, viewport.height),
+      dsSingle: clampLayout(layouts.dsSingle, viewport.width, viewport.height),
     }
   }, [layouts])
 
@@ -75,6 +77,7 @@ export const useFloatingLayout = () => {
         single: clampLayout(current.single, viewport.width, viewport.height),
         dsTop: clampLayout(current.dsTop, viewport.width, viewport.height),
         dsBottom: clampLayout(current.dsBottom, viewport.width, viewport.height),
+        dsSingle: clampLayout(current.dsSingle, viewport.width, viewport.height),
       }))
     }
 
