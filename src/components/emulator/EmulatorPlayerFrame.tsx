@@ -1,4 +1,5 @@
 import type { ReactNode, RefObject } from "react"
+import { useEffect, useState } from "react"
 import { Play } from "lucide-react"
 
 type EmulatorPlayerFrameProps = {
@@ -16,14 +17,32 @@ export function EmulatorPlayerFrame({
   iframeDoc,
   children,
 }: EmulatorPlayerFrameProps) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!running || !iframeDoc) {
+      setBlobUrl(null)
+      return
+    }
+    // iOS Safari có vấn đề với srcDoc iframes khi load external scripts
+    // Dùng blob URL thay thế — iOS hỗ trợ tốt hơn
+    const blob = new Blob([iframeDoc], { type: "text/html" })
+    const url = URL.createObjectURL(blob)
+    setBlobUrl(url)
+    return () => {
+      URL.revokeObjectURL(url)
+      setBlobUrl(null)
+    }
+  }, [running, iframeDoc])
+
   return (
     <div ref={screenRef} className="relative h-full min-h-[320px] overflow-hidden rounded-md border bg-black">
-      {running && iframeDoc ? (
+      {running && iframeDoc && blobUrl ? (
         <>
           <iframe
             ref={iframeRef}
             title="Emulator player"
-            srcDoc={iframeDoc}
+            src={blobUrl}
             tabIndex={0}
             className="h-full w-full border-0 touch-none"
             allow="cross-origin-isolated; gamepad; fullscreen; autoplay"
